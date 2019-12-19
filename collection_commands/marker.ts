@@ -4,6 +4,7 @@ import {TKey, ICollection} from "../interfaces";
 
 export interface IMarkedItem {
     marked: Boolean;
+
 }
 
 

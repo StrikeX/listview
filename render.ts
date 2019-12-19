@@ -11,4 +11,13 @@ export class Render{
     private onCheckboxClickHandler(){
 
     }
+    private onMouseDownHandler(){
+
+    }
+    private onMouseUpHandler(){
+
+    }
+    private onMouseMoveHandler(){
+
+    }
 }

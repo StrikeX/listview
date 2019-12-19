@@ -3,9 +3,14 @@ import Select from "./collection_commands/select";
 import Marker from "./collection_commands/marker";
 import Editing from "./collection_commands/editing";
 import Render from "./render";
+import {Display} from "./display"
+import {StartDragNDrop} from "./collection_commands/dragndrop";
 
 
-
+/*
+* в списке много задач, когда нжуно работать с данными из рекордсета
+* setSelectedKey могут позвать на записи, которые не в виртуальном скролле.
+* */
 class ListItem implements IListItem, Select.ISelectionItem, Marker.IMarkedItem {
     key: TKey = null;
     selected: Boolean = false;
@@ -32,13 +37,14 @@ interface  IListViewOptions {
     markedKey : TKey,
     selectedKeys: TKey[],
     excludedKeys: TKey[],
-    editingKey: null
+    editingKey: null,
+    collection: ICollection<IListItem>
 }
 
 class ListView {
     render: Render = new Render();
+    private display;
     constructor(
-        private collection: Collection,
         private selectionObject: ISelectionObject,
         private isEditing: Boolean = false,
         private options: IListViewOptions = {
@@ -46,12 +52,15 @@ class ListView {
             markedKey : null,
             selectedKeys: [],
             excludedKeys: [],
-            editingKey: null
+            editingKey: null,
+            collection: null
         }
     ) {
     }
 
     _beforeMount(options: IListViewOptions){
+
+        this.display = new Display(0, 100, options.collection);
 
         let commands: ICollectionCommand<>[] = [];
         commands.push(new Marker.Mark(options.markedKey));
@@ -61,7 +70,7 @@ class ListView {
         }
         //операции над записью будем рассчитывать лениво, при наведении мышкой
         //commands.push(new Actions.Sync(options.itemActions));
-        this.execCommands(commands);
+        this.display.executeCommands(commands);
     }
 
     /*
@@ -70,7 +79,7 @@ class ListView {
     onCheckBoxClickHandler(key: TKey) {
         //TODO как изменить options.selectedKeys и options.excludedKeys?
         let selectToggle = new Select.Toggle(this.options.selectedKeys, this.options.excludedKeys, key);
-        this.execCommands([selectToggle]);
+        this.display.executeCommands(([selectToggle]);
     }
 
     /*
@@ -84,39 +93,54 @@ class ListView {
         if (this.isEditing) {
             commands.push(new Editing.Begin(key))
         }
-        this.execCommands(commands);
-        this.notify(mark.getNewValue());
+        this.display.executeCommands(commands);
+        //this.notify(mark.getNewValue());
     }
 
 
     onDownClick() {
         //TODO как изменить markedKey?
         let markNext = new Marker.MarkNext();
-        this.execCommands([markNext]);
-        this.notify(markNext.getNewValue());
+        this.display.executeCommands([markNext]);
+        //this.notify(markNext.getNewValue());
     }
     onUpClick() {
         //TODO как изменить markedKey?
         let markPrev = new Marker.MarkPrev();
-        this.execCommands([markPrev]);
-        this.notify(markPrev.getNewValue());
+        this.display.executeCommands([markPrev]);
+        //this.notify(markPrev.getNewValue());
     }
     onItemActionClick(){
         //TODO как нотиваить события?
         //TODO как подписаться на события Render?
-        this.notify()
+        //this.notify()
     }
     /*
         работа с редактированием по месту
      */
     onApplyEditing() {
         let editingApply = new Editing.Apply(this.options.isProceedEditing);
-        this.execCommands([editingApply]);
+        this.display.executeCommands([editingApply]);
     }
     onCancelEditing() {
         let editingCancel = new Editing.Cancel();
-        this.execCommands([editingCancel]);
+        this.display.executeCommands([editingCancel]);
     }
+/*drag-n-drop*/
+    private onMouseDownHandler(){
+
+
+    }
+    private onMouseUpHandler(){
+
+    }
+    private onMouseMoveHandler(key:TKey){
+        this.
+        let startDragnDrop = new StartDragNDrop();
+        startDragnDrop.execute(this.display, key);
+        //this.execCommands([])
+    }
+
 
     execCommands(commands: ICollectionCommand<any>[]) {
         commands.forEach(command => {
@@ -124,5 +148,6 @@ class ListView {
 
         });
     }
+
 }
 

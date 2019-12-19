@@ -8,7 +8,9 @@ export interface ISelectionItem {
 export class Sync implements ICollectionCommand<IListItem> {
     constructor(private selectedKeys: TKey[], private excludedKeys: TKey[]) {}
 
-    execute(collection: ICollection<IListItem>): void {}
+    execute(collection: ICollection<IListItem>): void {
+
+    }
 }
 
 export class Toggle implements ICollectionCommand<ISelectionItem> {
