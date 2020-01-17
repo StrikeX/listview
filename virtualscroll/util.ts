@@ -6,8 +6,15 @@ export function canScrollToItem(index: number, range: IRange, heights: IHeights)
     return result;
 }
 
-export function getActiveElement(range: IRange, heights: IHeights): number {
+export function getActiveElementIndex(range: IRange, heights: IHeights): number {
     /**
      * Расчет активного элемента
      */
+    if (isScrolledToBottom()) {
+        return range.stop - 1;
+    } else if (isScrolledToTop()) {
+        return range.start;
+    } else {
+        let
+    }
 }
