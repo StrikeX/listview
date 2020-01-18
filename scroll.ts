@@ -177,7 +177,7 @@ class Scroll {
     }
 
     private recalcToDirection(triggerName): void {
-        const result = VS.getRangeByDirection(triggerName, this.range, this._options.segmentSize, this.heights);
+        const result = this._virtualScroll.updateRangeByDirection(triggerName, this.heights);
         this.applyIndexes(result.range);
 
         if (result.needToLoad) {
