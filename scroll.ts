@@ -71,7 +71,7 @@ class Scroll {
         if (options.itemHeightProperty) {
             this.saveHeightsFromItemHeightProperty(options.collection, options.itemHeightProperty);
             this.applyIndexes(
-                this._virtualScroll.setRangeByItemHeightProperty(
+                this._virtualScroll.updateRangeByItemHeightProperty(
                     initialIndex, this.heights
                 )
             );
@@ -164,7 +164,7 @@ class Scroll {
      * Обработчик на событие смещения скроллбара
      */
     private scrollBarMove(): void {
-        this.applyIndexes(VS.getRangeByScrollTop(this.heights));
+        this.applyIndexes(this._virtualScroll.updateRangeByScrollTop(this.heights));
     }
 
 
