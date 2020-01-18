@@ -190,12 +190,13 @@ class Scroll {
      * @param id
      */
     scrollToItem(id: string): Promise<void> {
+        const idx = this._options.collection.getIndexById(id);
         return new Promise(resolve => {
-            if (scrollUtils.canScrollToItem(getIndexById(id), this.range, this.heights)) {
+            if (scrollUtils.canScrollToItem(idx, this._virtualScroll.range, this.heights)) {
                 this.scrollSync();
                 resolve();
             } else {
-                await this.applyIndexes(VS.getRangeByIndex(getIndexById(id)));
+                await this.applyIndexes(this._virtualScroll.updateRangeByIndex(idx, this._itemsHeights.length));
                 this.scrollSync();
                 resolve();
             }

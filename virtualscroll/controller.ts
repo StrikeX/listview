@@ -16,6 +16,10 @@ export default class VirtualScroll {
     private _options: IVirtualScrollOptions;
     private _range: IRange;
 
+    get range() {
+        return this._range;
+    }
+
     constructor(options: Partial<IVirtualScrollOptions>) {
         this.setOptions(options);
     }
