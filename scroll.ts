@@ -1,45 +1,47 @@
-import * as VS from './virtualscroll/controller';
+import VirtualScroll from './virtualscroll/controller';
 import * as scrollUtils from './virtualscroll/util';
 import {ICollection} from "./interfaces";
+import {IHeights} from "./virtualscroll/interfaces";
 
 interface IOptions {
     collection: ICollection;
+    pageSize: number;
+    segmentSize: number;
+    activeElement?: string;
+    itemHeightProperty?: string;
 }
 
-interface IRange {
-    start: number;
-    stop: number;
+interface IScrollEventParams {
+    viewportHeight: number;
+    scrollTop: number;
+    scrollHeight: number;
 }
 
 class Scroll {
     // Флаг необходимости восстановления скролла
-    private restoreScroll: boolean;
+    private _restoreScroll: boolean;
     // Данные о высотах
-    private itemsHeights: number[];
-    private viewportHeight: number;
-    private itemsContainerHeight: number;
-    private triggerOffset: number;
-    private scrollTop: number;
+    private _itemsHeights: number[];
+    private _itemsOffsets: number[];
+    private _viewportHeight: number;
+    private _itemsContainerHeight: number;
+    private _triggerOffset: number;
+    private _scrollTop: number;
+    private _virtualScroll: VirtualScroll = new VirtualScroll({});
 
     private get heights(): IHeights {
         return {
-            viewport: this.viewportHeight,
-            trigger: this.triggerOffset,
-            itemsContainer: this.itemsContainerHeight,
-            scrollTop: this.scrollTop,
-            items: this.itemsHeights
-        }
+            viewport: this._viewportHeight,
+            trigger: this._triggerOffset,
+            itemsContainer: this._itemsContainerHeight,
+            scrollTop: this._scrollTop,
+            items: this._itemsHeights,
+            itemsOffsets: this._itemsOffsets
+        };
     }
 
-    protected _beforeMount(options): void {
-        if (options.itemHeightProperty) {
-            this.saveHeights(options.collection, options.itemHeightProperty);
-            this.applyIndexes(VS.getRangeByItemHeightProperty(options.activeElement, this.heights));
-        } else {
-            this.applyIndexes(VS.getRangeByIndex(options.activeElement));
-        }
-
-        this.subscribeToModelChange(options.collection);
+    protected _beforeMount(options: IOptions): void {
+        this.initVS(options);
     }
 
     protected _afterMount(): void {
@@ -48,15 +50,42 @@ class Scroll {
 
     protected _beforeUpdate(options): void {
         if (options.collection !== this._options.collection) {
-            this.subscribeToModelChange(options.collection);
+            this.initVS(options);
         }
     }
 
     protected _afterRender(): void {
-        if (this.restoreScroll) {
+        if (this._restoreScroll) {
             this.restoreScrollPosition();
-            this.restoreScroll = false;
+            this._restoreScroll = false;
         }
+    }
+
+    private initVS(options: IOptions): void {
+        this._virtualScroll.setOptions({
+            segmentSize: options.segmentSize, pageSize: options.pageSize
+        });
+
+        const initialIndex = options.activeElement ? options.collection.getItemIndexById(options.activeElement) : 0;
+
+        if (options.itemHeightProperty) {
+            this.saveHeightsFromItemHeightProperty(options.collection, options.itemHeightProperty);
+            this.applyIndexes(
+                this._virtualScroll.setRangeByItemHeightProperty(
+                    initialIndex, this.heights
+                )
+            );
+        } else {
+            this.applyIndexes(this._virtualScroll.updateRangeByIndex(initialIndex, options.collection.getCount()));
+        }
+
+        this.subscribeToModelChange(options.collection);
+    }
+
+    private saveHeightsFromItemHeightProperty(collection: ICollection, property: string): void {
+        collection.each((item, index) => {
+            this._itemsHeights[index] = item.get(property);
+        });
     }
 
     private subscribeToModelChange(model: ICollection): void {
@@ -90,7 +119,7 @@ class Scroll {
      */
     private applyIndexes(indexes): void {
         this._options.collection.applyIndexes(indexes);
-        this.restoreScroll = true;
+        this._restoreScroll = true;
     }
 
     private observeScrollEvents(): void {
@@ -102,9 +131,24 @@ class Scroll {
      * @param action
      * @param params
      */
-    private scrollEventHandler(action: string, params: {scrollTop: number, scrollHeight: number, viewportHeight: number}): void {
-        this.saveHeights(params);
+    private scrollEventHandler(action: string, params: IScrollEventParams): void {
+        this.updateHeights(params);
         this[action](params);
+    }
+
+    private viewresizeEvent(): void {
+        this.updateHeights();
+    }
+
+    private updateHeights(params?: IScrollEventParams) {
+        if (params) {
+            this._viewportHeight = params.viewportHeight;
+            this._itemsContainerHeight = params.scrollHeight;
+            this._scrollTop = params.scrollTop;
+        }
+
+        this.updateTriggerOffset();
+        this.updateItemsHeights();
     }
 
     /**
