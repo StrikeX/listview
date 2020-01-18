@@ -15,6 +15,6 @@ export function getActiveElementIndex(range: IRange, heights: IHeights): number 
     } else if (isScrolledToTop()) {
         return range.start;
     } else {
-        let
+        return getActiveElementByOffset(heights);
     }
 }
