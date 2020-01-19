@@ -1,4 +1,6 @@
-export function canScrollToItem(index: number, range: IRange, heights: IHeights): boolean {
+import {IContainerHeights, IItemsHeights} from "./interfaces";
+
+export function canScrollToItem(index: number, range: IRange, itemsHeights: IItemsHeights, containerHeights: IContainerHeights): boolean {
     /**
      * Расчет возможности подскроллить к элементу, если к элементу невозможно подскроллить то необходимо пересчитать
      * индексы от этого элемента
@@ -6,7 +8,7 @@ export function canScrollToItem(index: number, range: IRange, heights: IHeights)
     return result;
 }
 
-export function getActiveElementIndex(range: IRange, heights: IHeights): number {
+export function getActiveElementIndex(range: IRange, itemsHeights: IItemsHeights, containerHeights: IContainerHeights): number {
     /**
      * Расчет активного элемента
      */
