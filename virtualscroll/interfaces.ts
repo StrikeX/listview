@@ -11,8 +11,6 @@ export interface IRange {
 export interface IContainerHeights {
     // Высота вьюпорта
     viewport: number;
-    // Высота позиции скролла
-    scrollTop: number;
     // Высота контейнера
     scrollHeight: number;
     // Высота триггера
@@ -24,6 +22,11 @@ export interface IItemsHeights {
     itemsHeights: number[];
     // Оффсеты элементов
     itemsOffsets: number[];
+}
+
+export interface IPreviewHeights {
+    itemsHeights: number[];
+    viewportHeight: number;
 }
 
 interface IVirtualScrollOptions {

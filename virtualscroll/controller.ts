@@ -1,7 +1,6 @@
-import {IRange, IContainerHeights, IDirection, IItemsHeights, IVirtualScrollOptions} from "./interfaces";
+import {IRange, IContainerHeights, IDirection, IItemsHeights, IVirtualScrollOptions, IPreviewHeights} from "./interfaces";
 
 export default class VirtualScroll {
-    private _itemsHeightsData: IItemsHeights = {itemsHeights: [], itemsOffsets: []};
     private _containerHeightsData: IContainerHeights = {scrollHeight: 0, scrollTop: 0, trigger: 0, viewport: 0};
     private _options: IVirtualScrollOptions;
     private _range: IRange;
@@ -11,97 +10,30 @@ export default class VirtualScroll {
         return this._range;
     }
 
-    get itemsHeightsData() {
-        return this._itemsHeightsData;
-    }
-
     get containerHeightsData() {
         return this._containerHeightsData;
     }
 
     constructor(
         options: Partial<IVirtualScrollOptions>,
-        itemsData: Partial<IItemsHeights>,
         containerData: Partial<IContainerHeights>
     ) {
         this.setOptions(options);
         this.applyContainerHeightsData(containerData);
-        this.applyItemsData(itemsData);
     }
 
     setOptions(options: Partial<IVirtualScrollOptions>): void {
         this._options = {...this._options, ...options};
     }
 
-    applyItemsData(itemsData: Partial<IItemsHeights>): void {
-        this._itemsHeightsData = {...this._itemsHeightsData, ...itemsData};
-    }
-
     applyContainerHeightsData(containerData: Partial<IContainerHeights>): void {
         this._containerHeightsData = {...this._containerHeightsData, ...containerData};
     }
 
-    /**
-     * Расчет видимых индексов от переданного индекса
-     * @remark
-     * Вызывается при инциализации виртуального скролла от переданного индекса
-     * @param startIndex
-     * @param itemsCount
-     */
-    updateRangeByIndex(startIndex: number): IRange {
-        const pageSize = this._options.pageSize;
-        const itemsCount = this._itemsHeightsData.itemsHeights.length;
-        let start, stop;
-
-        if (pageSize < itemsCount) {
-            start = startIndex;
-            stop = start + pageSize;
-
-            if (stop >= itemsCount) {
-                stop = itemsCount;
-                start = stop - pageSize;
-            }
-        } else {
-            start = 0;
-            stop = itemsCount;
-        }
-
-        return this._setRange({start, stop});
-    }
-
-    /**
-     * Расчет видимых индексов от заранее высчитанных высот
-     * @remark
-     * Используется для оптимизаций частных случаев, когда построить один лишний элемент будет очень дорого,
-     * например если один элемент это огромный пункт с кучей контролов внутри)
-     * @param startIndex Начальный индекс
-     */
-    updateRangeByItemHeightProperty(startIndex: number): IRange {
-        const itemsHeights = this._itemsHeightsData.itemsHeights;
-        const viewport = this._containerHeightsData.viewport;
-
-        let sumHeight = 0;
-        let stop: number;
-
-        for (let i = startIndex; i < itemsHeights.length; i++) {
-            const itemHeight = itemsHeights[i];
-            if (sumHeight + itemHeight <= viewport) {
-                sumHeight += itemHeight;
-            } else {
-                stop = i;
-                break;
-            }
-        }
-
-        /**
-         * @remark Так как списки итерируются пока i < stopIndex, то нужно добавить 1
-         * @example items: [{height: 20, ...}, {height: 40, ...}, {height: 50, ...}], itemHeightProperty: 'height'
-         * viewportHeight: 70
-         * Если бы мы не добавили единицу, то получили бы startIndex = 0 и stopIndex = 2, но так как итерируюется
-         * пока i < stopIndex, то мы получим не три отрисованных элемента, а 2
-         */
-
-        return this._setRange({start: startIndex, stop: stop + 1});
+    createNewRange(startIndex: number, itemsCount: number, previewHeights?: IPreviewHeights): IRange {
+        return previewHeights ?
+            this.createRangeByIndex(startIndex, itemsCount) :
+            this._createRangeByItemHeightProperty(startIndex, itemsCount, previewHeights);
     }
 
     /**
@@ -109,10 +41,8 @@ export default class VirtualScroll {
      * @remark
      * Вызывается при смещении скролла за счет движения скроллбара
      */
-    updateRangeByScrollTop(): IRange {
-        const scrollTop = this._containerHeightsData.scrollTop;
+    moveRangeByScrollPosition(scrollTop: number, itemsHeights: number[]): IRange {
         const pageSize = this._options.pageSize;
-        const itemsHeights = this._itemsHeightsData.itemsHeights;
         const itemsCount = itemsHeights.length;
         const triggerHeight = this._containerHeightsData.trigger;
 
@@ -144,30 +74,42 @@ export default class VirtualScroll {
         return this._setRange({start, stop});
     }
 
-    updateRangeByDirection(direction: IDirection, shouldLoad: boolean= true): {
+    moveRangeByItemsAdd(direction: IDirection, itemsHeightsData: IItemsHeights, newItemsLength: number): IRange {
+        if (direction === 'up') {
+            this._updateStartIndex(this._range.start + newItemsLength, itemsHeightsData.itemsHeights.length);
+        }
+
+        return this.moveRangeByDirection(direction, itemsHeightsData).range;
+    }
+
+    moveRangeByItemsRemove(direciton: IDirection, itemsHeightsData: IItemsHeights): IRange {
+        return this.moveRangeByDirection(direciton, itemsHeightsData).range;
+    }
+
+    moveRangeByDirection(direction: IDirection, itemsHeightsData: IItemsHeights): {
         range: IRange; needToLoad: boolean;
     } {
         this._oldRange = this._range;
-        const itemsCount = this._itemsHeightsData.itemsHeights.length;
+        const itemsCount = itemsHeightsData.itemsHeights.length;
         const segmentSize = this._options.segmentSize;
         let {start, stop} = this._range;
-        let needToLoadMore: boolean = false;
+        let needToLoad: boolean = false;
 
         if (start === 0 && direction === 'up' || stop === itemsCount && direction === 'down') {
-            needToLoadMore = true;
+            needToLoad = true;
         } else {
-            const quantity = VirtualScroll.getItemsToHideQuantity(direction, this._containerHeightsData, this._itemsHeightsData);
+            const quantity = VirtualScroll.getItemsToHideQuantity(direction, this._containerHeightsData, itemsHeightsData);
 
             if (direction === 'up') {
                 if (start <= segmentSize) {
-                    needToLoadMore = true;
+                    needToLoad = true;
                 }
 
                 start = Math.max(0, start - segmentSize);
                 stop -= quantity;
             } else {
                 if (stop + segmentSize >= itemsCount) {
-                    needToLoadMore = true;
+                    needToLoad = true;
                 }
 
                 stop = Math.min(stop + segmentSize, itemsCount);
@@ -176,21 +118,84 @@ export default class VirtualScroll {
         }
 
         return {
-            needToLoad: needToLoadMore && shouldLoad, range: this._setRange({start, stop})
+            needToLoad, range: this._setRange({start, stop})
         }
     }
 
-    updateStartIndex(index: number): IRange {
-        const start = Math.max(0, index);
-        const stop = Math.min(this._itemsHeightsData.itemsHeights.length, this._range.start + this._options.pageSize)
-        this.startIndex = Math.max(0, index);
-        this.stopIndex = Math.min(this.itemsCount, this.startIndex + this._options.pageSize);
+    getRestoredPosition(direction: IDirection, scrollTop: number): number {
+        return direction === 'up' ?
+            scrollTop +  this._getItemsHeightsSum(this._range.start, this._oldRange.start) :
+            scrollTop - this._getItemsHeightsSum(this._oldRange.start, this._range.start);
     }
 
-    getRestoredPosition(direction: IDirection): number {
-        return direction === 'up' ?
-            this._containerHeightsData.scrollTop +  this._getItemsHeightsSum(this._range.start, this._oldRange.start) :
-            this._containerHeightsData.scrollTop - this._getItemsHeightsSum(this._oldRange.start, this._range.start);
+    /**
+     * Расчет видимых индексов от заранее высчитанных высот
+     * @remark
+     * Используется для оптимизаций частных случаев, когда построить один лишний элемент будет очень дорого,
+     * например если один элемент это огромный пункт с кучей контролов внутри)
+     * @param startIndex Начальный индекс
+     * @param itemsCount Количество элементов
+     * @param previewHeights Предрасчитанные высоты
+     */
+    private _createRangeByItemHeightProperty(startIndex: number, itemsCount: number, previewHeights: IPreviewHeights): IRange {
+        const {itemsHeights, viewportHeight} = previewHeights;
+
+        let sumHeight = 0;
+        let stop: number;
+
+        for (let i = startIndex; i < itemsHeights.length; i++) {
+            const itemHeight = itemsHeights[i];
+            if (sumHeight + itemHeight <= viewportHeight) {
+                sumHeight += itemHeight;
+            } else {
+                stop = i;
+                break;
+            }
+        }
+
+        /**
+         * @remark Так как списки итерируются пока i < stopIndex, то нужно добавить 1
+         * @example items: [{height: 20, ...}, {height: 40, ...}, {height: 50, ...}], itemHeightProperty: 'height'
+         * viewportHeight: 70
+         * Если бы мы не добавили единицу, то получили бы startIndex = 0 и stopIndex = 2, но так как итерируюется
+         * пока i < stopIndex, то мы получим не три отрисованных элемента, а 2
+         */
+
+        return this._setRange({start: startIndex, stop: stop + 1});
+    }
+
+    /**
+     * Расчет видимых индексов от переданного индекса
+     * @remark
+     * Вызывается при инциализации виртуального скролла от переданного индекса
+     * @param startIndex
+     * @param itemsCount
+     */
+    private createRangeByIndex(startIndex: number, itemsCount: number): IRange {
+        const pageSize = this._options.pageSize;
+        let start, stop;
+
+        if (pageSize < itemsCount) {
+            start = startIndex;
+            stop = start + pageSize;
+
+            if (stop >= itemsCount) {
+                stop = itemsCount;
+                start = stop - pageSize;
+            }
+        } else {
+            start = 0;
+            stop = itemsCount;
+        }
+
+        return this._setRange({start, stop});
+    }
+
+    private _updateStartIndex(index: number, itemsCount: number): IRange {
+        const start = Math.max(0, index);
+        const stop = Math.min(itemsCount, this._range.start + this._options.pageSize);
+        this._range.start = Math.max(0, index);
+        this._range.stop = Math.min(itemsCount, this._range.start + this._options.pageSize);
     }
 
     /**
