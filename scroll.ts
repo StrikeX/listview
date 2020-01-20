@@ -32,7 +32,7 @@ interface IScrollEventParams {
 }
 
 class Scroll {
-    private _virtualScroll: VirtualScroll = new VirtualScroll({}, {}, {});
+    private _virtualScroll: VirtualScroll = new VirtualScroll({}, {});
     private _options: IOptions;
     private _children: {
         observer: {
@@ -53,6 +53,9 @@ class Scroll {
     private _itemsData: IItemsHeights;
 
     private _triggerOffset: number;
+
+    // TODO scrollTop нужно где-то хранить, пока не придумал другого места кроме как этого
+    private _scrollTop: number;
 
     protected _beforeMount(options: IOptions): void {
         if (options.virtualScroll) {
@@ -105,14 +108,14 @@ class Scroll {
     private _virtualScrollToItem(index: number): Promise<void> {
         return new Promise((resolve) => {
             const callback = () => {
-                this._scrollToPosition(this._virtualScroll.itemsHeightsData.itemsOffsets[index]);
+                this._scrollToPosition(this._itemsData.itemsOffsets[index]);
                 resolve();
             };
 
             if (scrollUtils.canScrollToItem(
                 index,
                 this._virtualScroll.range,
-                this._virtualScroll.itemsHeightsData,
+                this._itemsData,
                 this._virtualScroll.containerHeightsData
             )) {
                 callback();
@@ -299,14 +302,13 @@ class Scroll {
     }
 
     private _redrawToDirection(direction: IDirection, range: IRange): void {
-
         this._applyIndexes(this._options.collection, range);
 
         // На следующую перерисовку нужно восстановить позицию скролла, так как при удалении и добавлении элементов браузеры
         // не умеют корректно восстанавливать позицию скролла
         // Демо на jsFiddle: https://jsfiddle.net/alex111089/9q0hgdre/
         this._afterRenderCallback = () => {
-            this._scrollToPosition(this._virtualScroll.getRestoredPosition(direction));
+            this._scrollToPosition(this._virtualScroll.getRestoredPosition(direction, this._scrollTop, this._itemsData.itemsHeights));
         };
     }
 
@@ -316,6 +318,7 @@ class Scroll {
      */
     private _updateHeights(params: Partial<IScrollEventParams>): void {
         this._virtualScroll.applyContainerHeightsData(params);
+        this._scrollTop = params.scrollTop;
     }
 
     private _updateItemsHeights(): void {
@@ -348,27 +351,6 @@ class Scroll {
         this._itemsChanged = true;
     }
 
-    private static getItemsHeightsDataByItemHeightProperty(collection: ICollection, property: string): IItemsHeights {
-        const itemsHeights = [];
-        const itemsOffsets = [];
-
-        let sum = 0;
-
-        collection.each((item, i) => {
-            const itemHeight = item.get(property);
-
-            itemsHeights[i] = itemHeight;
-            itemsOffsets[i] = sum;
-
-            sum += itemHeight;
-        });
-
-        return {
-            itemsHeights,
-            itemsOffsets
-        }
-    }
-
     private static getItemsHeightsDataByContainer(container: HTMLElement): IItemsHeights {
         const itemsHeights = [];
         const itemsOffsets = [];
@@ -388,18 +370,5 @@ class Scroll {
             itemsHeights,
             itemsOffsets
         }
-    }
-
-    private static mockItemsHeightsData(length: number): IItemsHeights {
-        const mockData = [];
-
-        for (let i = 0; i < length; i++) {
-            mockData.push(0);
-        }
-
-        return {
-            itemsHeights: mockData.slice(),
-            itemsOffsets: mockData.slice()
-        };
     }
 }

@@ -29,7 +29,7 @@ export interface IPreviewHeights {
     viewportHeight: number;
 }
 
-interface IVirtualScrollOptions {
+export interface IVirtualScrollOptions {
     /**
      * Размер виртуальной страницы
      * Используется для построения от индекса

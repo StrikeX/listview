@@ -122,10 +122,10 @@ export default class VirtualScroll {
         }
     }
 
-    getRestoredPosition(direction: IDirection, scrollTop: number): number {
+    getRestoredPosition(direction: IDirection, scrollTop: number, itemsHeights: number[]): number {
         return direction === 'up' ?
-            scrollTop +  this._getItemsHeightsSum(this._range.start, this._oldRange.start) :
-            scrollTop - this._getItemsHeightsSum(this._oldRange.start, this._range.start);
+            scrollTop +  this._getItemsHeightsSum(this._range.start, this._oldRange.start, itemsHeights) :
+            scrollTop - this._getItemsHeightsSum(this._oldRange.start, this._range.start, itemsHeights);
     }
 
     /**
@@ -191,7 +191,7 @@ export default class VirtualScroll {
         return this._setRange({start, stop});
     }
 
-    private _updateStartIndex(index: number, itemsCount: number): IRange {
+    private _updateStartIndex(index: number, itemsCount: number): void {
         const start = Math.max(0, index);
         const stop = Math.min(itemsCount, this._range.start + this._options.pageSize);
         this._range.start = Math.max(0, index);
@@ -229,11 +229,11 @@ export default class VirtualScroll {
         return this._range = range;
     }
 
-    private _getItemsHeightsSum(startIndex: number, stopIndex: number): number {
+    private _getItemsHeightsSum(startIndex: number, stopIndex: number, itemsHeights: number[]): number {
         let sum = 0;
 
         for (let i = startIndex; i < stopIndex; i++) {
-            sum += this._itemsHeightsData.itemsHeights[i];
+            sum += itemsHeights[i];
         }
 
         return sum;
