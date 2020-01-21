@@ -26,6 +26,14 @@ export default class VirtualScroll {
         return this._itemsHeightData;
     }
 
+    get itemsOffsets() {
+        return this._itemsHeightData.itemsOffsets;
+    }
+
+    get itemsHeights() {
+        return this._itemsHeightData.itemsHeights;
+    }
+
     constructor(
         options: Partial<IVirtualScrollOptions>,
         containerData: Partial<IContainerHeights>
@@ -102,10 +110,9 @@ export default class VirtualScroll {
      * Производит смещение диапазона за счет добавления новых элементов
      * @param addIndex индекс начиная с которого происходит вставка элементов
      * @param count количество вставляемых элементов
-     * @param newStartIndex новый начальный индекс, вычисленный исходя из добавленных элементов
      */
-    addItems(addIndex: number, count: number, newStartIndex: number): IRange {
-        const direction = addIndex >= newStartIndex ? 'up' : 'down';
+    addItems(addIndex: number, count: number): IRange {
+        const direction = addIndex >= this._range.start ? 'up' : 'down';
         this._insertItemHeights(addIndex, count);
 
         if (direction === 'up') {
@@ -119,76 +126,93 @@ export default class VirtualScroll {
      * Производит смещение диапазона за счет удаления элементов
      * @param removeIndex индекс начиная с которого происходит удаление элементов
      * @param count количество удаляемых элементов
-     * @param newStartIndex новый начальный индекс, вычисленный исходя из удаленных элементов
      */
-    removeItems(removeIndex: number, count: number, newStartIndex: number): IRange {
-        const direction = removeIndex < newStartIndex ? 'up' : 'down';
+    removeItems(removeIndex: number, count: number): IRange {
+        const direction = removeIndex < this._range.start ? 'up' : 'down';
         this._removeItemHeights(removeIndex, count);
 
         return this.moveToDirection(direction).range;
     }
 
-    moveToDirection(direction: IDirection): {
-        range: IRange; needToLoad: boolean;
-    } {
+    /**
+     * Производит смещение диапазона по направлению на segmentSize
+     * @param direction
+     */
+    moveToDirection(direction: IDirection): IRange {
         this._oldRange = this._range;
         const itemsHeightsData = this._itemsHeightData;
         const itemsCount = itemsHeightsData.itemsHeights.length;
         const segmentSize = this._options.segmentSize;
         let {start, stop} = this._range;
-        let needToLoad: boolean = false;
 
-        if (start === 0 && direction === 'up' || stop === itemsCount && direction === 'down') {
-            needToLoad = true;
+        const quantity = VirtualScroll.getItemsToHideQuantity(direction, this._containerHeightsData, itemsHeightsData);
+
+        if (direction === 'up') {
+            start = Math.max(0, start - segmentSize);
+            stop -= quantity;
         } else {
-            const quantity = VirtualScroll.getItemsToHideQuantity(direction, this._containerHeightsData, itemsHeightsData);
-
-            if (direction === 'up') {
-                if (start <= segmentSize) {
-                    needToLoad = true;
-                }
-
-                start = Math.max(0, start - segmentSize);
-                stop -= quantity;
-            } else {
-                if (stop + segmentSize >= itemsCount) {
-                    needToLoad = true;
-                }
-
-                stop = Math.min(stop + segmentSize, itemsCount);
-                start += quantity;
-            }
+            stop = Math.min(stop + segmentSize, itemsCount);
+            start += quantity;
         }
 
-        return {
-            needToLoad, range: this._setRange({start, stop})
-        }
+        return this._setRange({start, stop});
     }
 
+    /**
+     * Запоминает данные из ресайза вьюпорта на инстанс
+     * @param viewportHeight
+     * @param itemsHeights
+     */
     resizeViewport(viewportHeight: number, itemsHeights: IItemsHeights): void {
         this.applyContainerHeightsData({viewport: viewportHeight});
         this.updateItems(itemsHeights);
     }
 
+    /**
+     * Запоминает данные из ресайза вью на инстанс
+     * @param viewHeight
+     * @param itemsHeights
+     */
     resizeView(viewHeight: number, itemsHeights: IItemsHeights): void {
         this.applyContainerHeightsData({scroll: viewHeight});
         this.updateItems(itemsHeights);
     }
 
+    /**
+     * Запоминает позицию триггера после ресайза
+     * @param triggerHeight
+     */
     resizeTrigger(triggerHeight: number): void {
         this.applyContainerHeightsData({trigger: triggerHeight});
     }
 
+    /**
+     * Обновляет данные об элементах
+     * @param itemsHeightsData
+     */
     updateItems(itemsHeightsData: Partial<IItemsHeights>): void {
         this._itemsHeightData = {...this._itemsHeightData, ...itemsHeightsData};
     }
 
+    /**
+     * Возвращает восстановленную позицию скролла по направлению
+     * @param direction
+     * @param scrollTop
+     */
     getRestoredPosition(direction: IDirection, scrollTop: number): number {
         const itemsHeights = this._itemsHeightData.itemsHeights;
 
         return direction === 'up' ?
             scrollTop + this._getItemsHeightsSum(this._range.start, this._oldRange.start, itemsHeights) :
             scrollTop - this._getItemsHeightsSum(this._oldRange.start, this._range.start, itemsHeights);
+    }
+
+    /**
+     * Проверяет наличие элемента в диапазоне по его индексу
+     * @param itemIndex
+     */
+    isItemInRange(itemIndex: number): boolean {
+        return this._range.start >= itemIndex && this._range.stop <= itemIndex;
     }
 
     /**

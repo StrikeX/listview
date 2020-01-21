@@ -1,9 +1,10 @@
 import {IContainerHeights, IItemsHeights} from "./interfaces";
 
-export function canScrollToItem(index: number, range: IRange, itemsHeights: IItemsHeights, containerHeights: IContainerHeights): boolean {
+export function canScrollToItem(index: number, itemsOffsets: number[], containerHeights: IContainerHeights): boolean {
     /**
      * Расчет возможности подскроллить к элементу, если к элементу невозможно подскроллить то необходимо пересчитать
      * индексы от этого элемента
+     * @remark к элементу можно подскроллить если можно поставить его начало в начало вьюпорта
      */
     return result;
 }
