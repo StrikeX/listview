@@ -3,16 +3,18 @@ import {
     IContainerHeights,
     IDirection,
     IItemsHeights,
-    IVirtualScrollOptions,
-    IPreviewHeights
+    IVirtualScrollOptions
 } from "./interfaces";
 
 export default class VirtualScroll {
-    private _containerHeightsData: IContainerHeights = {scroll: 0, scrollTop: 0, trigger: 0, viewport: 0};
+    private _containerHeightsData: IContainerHeights = {scroll: 0, trigger: 0, viewport: 0};
     private _options: IVirtualScrollOptions;
     private _itemsHeightData: IItemsHeights = {itemsHeights: [], itemsOffsets: []};
-    private _range: IRange;
-    private _oldRange: IRange;
+    private _range: IRange = {start: 0, stop: 0};
+    private _oldRange: IRange = {start: 0, stop: 0};
+    private _savedDirection: IDirection;
+
+    rangeChanged: boolean;
 
     get range() {
         return this._range;
@@ -119,7 +121,7 @@ export default class VirtualScroll {
             this._updateStartIndex(this._range.start + count, this._itemsHeightData.itemsHeights.length);
         }
 
-        return this.moveToDirection(direction).range;
+        return this.moveToDirection(direction);
     }
 
     /**
@@ -131,7 +133,7 @@ export default class VirtualScroll {
         const direction = removeIndex < this._range.start ? 'up' : 'down';
         this._removeItemHeights(removeIndex, count);
 
-        return this.moveToDirection(direction).range;
+        return this.moveToDirection(direction);
     }
 
     /**
@@ -140,6 +142,7 @@ export default class VirtualScroll {
      */
     moveToDirection(direction: IDirection): IRange {
         this._oldRange = this._range;
+        this._savedDirection = direction;
         const itemsHeightsData = this._itemsHeightData;
         const itemsCount = itemsHeightsData.itemsHeights.length;
         const segmentSize = this._options.segmentSize;
@@ -191,20 +194,22 @@ export default class VirtualScroll {
      * @param itemsHeightsData
      */
     updateItems(itemsHeightsData: Partial<IItemsHeights>): void {
+        this.rangeChanged = false;
         this._itemsHeightData = {...this._itemsHeightData, ...itemsHeightsData};
     }
 
     /**
      * Возвращает восстановленную позицию скролла по направлению
-     * @param direction
      * @param scrollTop
      */
-    getRestoredPosition(direction: IDirection, scrollTop: number): number {
+    getRestoredPosition(scrollTop: number): number {
         const itemsHeights = this._itemsHeightData.itemsHeights;
-
-        return direction === 'up' ?
+        const savedPosition = this._savedDirection === 'up' ?
             scrollTop + this._getItemsHeightsSum(this._range.start, this._oldRange.start, itemsHeights) :
             scrollTop - this._getItemsHeightsSum(this._oldRange.start, this._range.start, itemsHeights);
+        this._savedDirection = null;
+
+        return savedPosition;
     }
 
     /**
@@ -222,7 +227,6 @@ export default class VirtualScroll {
      * например если один элемент это огромный пункт с кучей контролов внутри)
      * @param startIndex Начальный индекс
      * @param itemsCount Количество элементов
-     * @param previewHeights Предрасчитанные высоты
      */
     private _createRangeByItemHeightProperty(startIndex: number, itemsCount: number): IRange {
         const itemsHeights = this._itemsHeightData.itemsHeights;
@@ -230,14 +234,30 @@ export default class VirtualScroll {
 
         let sumHeight = 0;
         let stop: number;
+        let start: number = startIndex;
 
-        for (let i = startIndex; i < itemsHeights.length; i++) {
+        for (let i = start; i < itemsCount; i++) {
             const itemHeight = itemsHeights[i];
             if (sumHeight + itemHeight <= viewportHeight) {
                 sumHeight += itemHeight;
             } else {
                 stop = i;
                 break;
+            }
+        }
+
+        if (stop === itemsCount - 1) {
+            sumHeight = 0;
+
+            for (let i = itemsCount - 1; i > 0; i--) {
+                const itemHeight = itemsHeights[i];
+
+                if (sumHeight + itemHeight <= viewportHeight) {
+                    sumHeight += itemHeight;
+                } else {
+                    start = i;
+                    break;
+                }
             }
         }
 
@@ -248,8 +268,7 @@ export default class VirtualScroll {
          * Если бы мы не добавили единицу, то получили бы startIndex = 0 и stopIndex = 2, но так как итерируюется
          * пока i < stopIndex, то мы получим не три отрисованных элемента, а 2
          */
-
-        return this._setRange({start: startIndex, stop: stop + 1});
+        return this._setRange({start, stop: stop + 1});
     }
 
     /**
@@ -308,11 +327,11 @@ export default class VirtualScroll {
      * Рассчитывает сколько элементов нужно скрыть
      * @remark Оставляем элементов с запасом на 2 вьюпорта для плавного скроллинга
      */
-    private static getItemsToHideQuantity(direction: string, containerHeights: IContainerHeights, itemsHeights: IItemsHeights): number {
+    private static getItemsToHideQuantity(direction: string, currentRange: IRange, containerHeights: IContainerHeights, itemsHeights: IItemsHeights): number {
         if (direction === 'up') {
-            return VirtualScroll._getItemsToHideQuantityToUp(containerHeights, itemsHeights);
+            return VirtualScroll._getItemsToHideQuantityToUp(currentRange, containerHeights, itemsHeights);
         } else {
-            return VirtualScroll._getItemsToHideQuantityToDown(containerHeights, itemsHeights);
+            return VirtualScroll._getItemsToHideQuantityToDown(currentRange, containerHeights, itemsHeights);
         }
     }
 
@@ -320,19 +339,46 @@ export default class VirtualScroll {
     /**
      * Рассчитывает сколько элементов нужно скрыть сверху
      */
-    static _getItemsToHideQuantityToUp(heights: IContainerHeights, itemsHeights: IItemsHeights): number {
+    static _getItemsToHideQuantityToUp(currentRange: IRange, heights: IContainerHeights, itemsHeights: IItemsHeights): number {
+        let quantity = 0;
+        let stop = currentRange.stop - 1;
 
+        const offsetDistance = heights.viewport * 2 + scrollTop + heights.trigger;
+
+        while (itemsHeights.itemsOffsets[stop] > offsetDistance) {
+            stop--;
+            quantity++;
+        }
+
+        return quantity;
     }
 
     /**
      * Рассчитывает сколько элементов нужно скрыть сверху
      */
-    static _getItemsToHideQuantityToDown(heights: IContainerHeights, itemsHeights: IItemsHeights): number {
+    static _getItemsToHideQuantityToDown(currentRange: IRange, heights: IContainerHeights, itemsHeights: IItemsHeights): number {
+        let quantity = 0;
+        let start = currentRange.start;
+        let sumHeight = 0;
+        const offsetDistance = scrollTop - heights.trigger - heights.viewport;
 
+
+        while (sumHeight + itemsHeights.itemsHeights[start] < offsetDistance) {
+            sumHeight += itemsHeights.itemsHeights[start];
+            quantity++;
+            start++;
+        }
+
+        return quantity;
     }
 
     private _setRange(range: IRange): IRange {
-        return this._range = range;
+        if (range.start !== this._range.start || range.stop !== this._range.stop) {
+            this._range = range;
+            this.rangeChanged = true;
+        }
+
+        return this._range;
     }
 
     private _getItemsHeightsSum(startIndex: number, stopIndex: number, itemsHeights: number[]): number {

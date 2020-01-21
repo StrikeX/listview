@@ -24,11 +24,6 @@ export interface IItemsHeights {
     itemsOffsets: number[];
 }
 
-export interface IPreviewHeights {
-    itemsHeights: number[];
-    viewportHeight: number;
-}
-
 export interface IVirtualScrollOptions {
     /**
      * Размер виртуальной страницы
