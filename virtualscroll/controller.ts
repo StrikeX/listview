@@ -74,8 +74,8 @@ export default class VirtualScroll {
         return this._setRange({start, stop});
     }
 
-    moveRangeByItemsAdd(direction: IDirection, itemsHeightsData: IItemsHeights, newItemsLength: number): IRange {
-        if (direction === 'up') {
+    moveRangeByItemsAdd(direction: IDirection, itemsHeightsData: IItemsHeights, newItemsLength: number, itemsFromLoadToDirection?: boolean): IRange {
+        if (direction === 'up' && itemsFromLoadToDirection) {
             this._updateStartIndex(this._range.start + newItemsLength, itemsHeightsData.itemsHeights.length);
         }
 
