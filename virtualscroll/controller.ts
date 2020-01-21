@@ -100,9 +100,9 @@ export default class VirtualScroll {
 
     /**
      * Производит смещение диапазона за счет добавления новых элементов
-     * @param addIndex индекс
-     * @param count
-     * @param newStartIndex
+     * @param addIndex индекс начиная с которого происходит вставка элементов
+     * @param count количество вставляемых элементов
+     * @param newStartIndex новый начальный индекс, вычисленный исходя из добавленных элементов
      */
     addItems(addIndex: number, count: number, newStartIndex: number): IRange {
         const direction = addIndex >= newStartIndex ? 'up' : 'down';
@@ -117,9 +117,9 @@ export default class VirtualScroll {
 
     /**
      * Производит смещение диапазона за счет удаления элементов
-     * @param removeIndex
-     * @param count
-     * @param newStartIndex
+     * @param removeIndex индекс начиная с которого происходит удаление элементов
+     * @param count количество удаляемых элементов
+     * @param newStartIndex новый начальный индекс, вычисленный исходя из удаленных элементов
      */
     removeItems(removeIndex: number, count: number, newStartIndex: number): IRange {
         const direction = removeIndex < newStartIndex ? 'up' : 'down';
