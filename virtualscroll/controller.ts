@@ -343,7 +343,7 @@ export default class VirtualScroll {
         let quantity = 0;
         let stop = currentRange.stop - 1;
 
-        const offsetDistance = heights.viewport * 2 + (heights.scroll - heights.viewport) + heights.trigger;
+        const offsetDistance = heights.viewport * 2 + heights.trigger;
 
         while (itemsHeights.itemsOffsets[stop] > offsetDistance) {
             stop--;
