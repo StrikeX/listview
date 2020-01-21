@@ -1,8 +1,16 @@
-import {IRange, IContainerHeights, IDirection, IItemsHeights, IVirtualScrollOptions, IPreviewHeights} from "./interfaces";
+import {
+    IRange,
+    IContainerHeights,
+    IDirection,
+    IItemsHeights,
+    IVirtualScrollOptions,
+    IPreviewHeights
+} from "./interfaces";
 
 export default class VirtualScroll {
-    private _containerHeightsData: IContainerHeights = {scrollHeight: 0, scrollTop: 0, trigger: 0, viewport: 0};
+    private _containerHeightsData: IContainerHeights = {scroll: 0, scrollTop: 0, trigger: 0, viewport: 0};
     private _options: IVirtualScrollOptions;
+    private _itemsHeightData: IItemsHeights = {itemsHeights: [], itemsOffsets: []};
     private _range: IRange;
     private _oldRange: IRange;
 
@@ -12,6 +20,10 @@ export default class VirtualScroll {
 
     get containerHeightsData() {
         return this._containerHeightsData;
+    }
+
+    get itemsHeightsData() {
+        return this._itemsHeightData;
     }
 
     constructor(
@@ -30,10 +42,21 @@ export default class VirtualScroll {
         this._containerHeightsData = {...this._containerHeightsData, ...containerData};
     }
 
-    createNewRange(startIndex: number, itemsCount: number, previewHeights?: IPreviewHeights): IRange {
-        return previewHeights ?
-            this.createRangeByIndex(startIndex, itemsCount) :
-            this._createRangeByItemHeightProperty(startIndex, itemsCount, previewHeights);
+    /**
+     * Создает новый диапазон видимых индексов
+     * @remark Используется при инициализации
+     * @param startIndex Начальный индекс создаваемого диапазона
+     * @param itemsCount Общее количество элементов
+     * @param itemsHeights Высоты элементов
+     */
+    createNewRange(startIndex: number, itemsCount: number, itemsHeights?: Partial<IItemsHeights>): IRange {
+        if (itemsHeights) {
+            this.updateItems(itemsHeights);
+
+            return this._createRangeByItemHeightProperty(startIndex, itemsCount);
+        } else {
+            return this._createRangeByIndex(startIndex, itemsCount);
+        }
     }
 
     /**
@@ -41,7 +64,8 @@ export default class VirtualScroll {
      * @remark
      * Вызывается при смещении скролла за счет движения скроллбара
      */
-    moveRangeByScrollPosition(scrollTop: number, itemsHeights: number[]): IRange {
+    moveToScrollPosition(scrollTop: number): IRange {
+        const itemsHeights = this._itemsHeightData.itemsHeights;
         const pageSize = this._options.pageSize;
         const itemsCount = itemsHeights.length;
         const triggerHeight = this._containerHeightsData.trigger;
@@ -74,22 +98,41 @@ export default class VirtualScroll {
         return this._setRange({start, stop});
     }
 
-    moveRangeByItemsAdd(direction: IDirection, itemsHeightsData: IItemsHeights, newItemsLength: number, itemsFromLoadToDirection?: boolean): IRange {
-        if (direction === 'up' && itemsFromLoadToDirection) {
-            this._updateStartIndex(this._range.start + newItemsLength, itemsHeightsData.itemsHeights.length);
+    /**
+     * Производит смещение диапазона за счет добавления новых элементов
+     * @param addIndex индекс
+     * @param count
+     * @param newStartIndex
+     */
+    addItems(addIndex: number, count: number, newStartIndex: number): IRange {
+        const direction = addIndex >= newStartIndex ? 'up' : 'down';
+        this._insertItemHeights(addIndex, count);
+
+        if (direction === 'up') {
+            this._updateStartIndex(this._range.start + count, this._itemsHeightData.itemsHeights.length);
         }
 
-        return this.moveRangeByDirection(direction, itemsHeightsData).range;
+        return this.moveToDirection(direction).range;
     }
 
-    moveRangeByItemsRemove(direciton: IDirection, itemsHeightsData: IItemsHeights): IRange {
-        return this.moveRangeByDirection(direciton, itemsHeightsData).range;
+    /**
+     * Производит смещение диапазона за счет удаления элементов
+     * @param removeIndex
+     * @param count
+     * @param newStartIndex
+     */
+    removeItems(removeIndex: number, count: number, newStartIndex: number): IRange {
+        const direction = removeIndex < newStartIndex ? 'up' : 'down';
+        this._removeItemHeights(removeIndex, count);
+
+        return this.moveToDirection(direction).range;
     }
 
-    moveRangeByDirection(direction: IDirection, itemsHeightsData: IItemsHeights): {
+    moveToDirection(direction: IDirection): {
         range: IRange; needToLoad: boolean;
     } {
         this._oldRange = this._range;
+        const itemsHeightsData = this._itemsHeightData;
         const itemsCount = itemsHeightsData.itemsHeights.length;
         const segmentSize = this._options.segmentSize;
         let {start, stop} = this._range;
@@ -122,9 +165,29 @@ export default class VirtualScroll {
         }
     }
 
-    getRestoredPosition(direction: IDirection, scrollTop: number, itemsHeights: number[]): number {
+    resizeViewport(viewportHeight: number, itemsHeights: IItemsHeights): void {
+        this.applyContainerHeightsData({viewport: viewportHeight});
+        this.updateItems(itemsHeights);
+    }
+
+    resizeView(viewHeight: number, itemsHeights: IItemsHeights): void {
+        this.applyContainerHeightsData({scroll: viewHeight});
+        this.updateItems(itemsHeights);
+    }
+
+    resizeTrigger(triggerHeight: number): void {
+        this.applyContainerHeightsData({trigger: triggerHeight});
+    }
+
+    updateItems(itemsHeightsData: Partial<IItemsHeights>): void {
+        this._itemsHeightData = {...this._itemsHeightData, ...itemsHeightsData};
+    }
+
+    getRestoredPosition(direction: IDirection, scrollTop: number): number {
+        const itemsHeights = this._itemsHeightData.itemsHeights;
+
         return direction === 'up' ?
-            scrollTop +  this._getItemsHeightsSum(this._range.start, this._oldRange.start, itemsHeights) :
+            scrollTop + this._getItemsHeightsSum(this._range.start, this._oldRange.start, itemsHeights) :
             scrollTop - this._getItemsHeightsSum(this._oldRange.start, this._range.start, itemsHeights);
     }
 
@@ -137,8 +200,9 @@ export default class VirtualScroll {
      * @param itemsCount Количество элементов
      * @param previewHeights Предрасчитанные высоты
      */
-    private _createRangeByItemHeightProperty(startIndex: number, itemsCount: number, previewHeights: IPreviewHeights): IRange {
-        const {itemsHeights, viewportHeight} = previewHeights;
+    private _createRangeByItemHeightProperty(startIndex: number, itemsCount: number): IRange {
+        const itemsHeights = this._itemsHeightData.itemsHeights;
+        const viewportHeight = this._containerHeightsData.viewport;
 
         let sumHeight = 0;
         let stop: number;
@@ -171,7 +235,7 @@ export default class VirtualScroll {
      * @param startIndex
      * @param itemsCount
      */
-    private createRangeByIndex(startIndex: number, itemsCount: number): IRange {
+    private _createRangeByIndex(startIndex: number, itemsCount: number): IRange {
         const pageSize = this._options.pageSize;
         let start, stop;
 
@@ -196,6 +260,24 @@ export default class VirtualScroll {
         const stop = Math.min(itemsCount, this._range.start + this._options.pageSize);
         this._range.start = Math.max(0, index);
         this._range.stop = Math.min(itemsCount, this._range.start + this._options.pageSize);
+    }
+
+    private _insertItemHeights(insertIndex: number, length: number) {
+        const topItemsHeight = this._itemsHeightData.itemsHeights.slice(0, insertIndex + 1);
+        const insertedItemsHeights = [];
+        const bottomItemsHeight = this._itemsHeightData.itemsHeights.slice(insertIndex + 1);
+
+        for (let i = 0; i < length; i++) {
+            insertedItemsHeights[i] = 0;
+        }
+
+        this.updateItems({itemsHeights: topItemsHeight.concat(insertedItemsHeights, bottomItemsHeight)});
+    }
+
+    private _removeItemHeights(removeIndex: number, length: number) {
+        this.updateItems({
+            itemsHeights: this._itemsHeightData.itemsHeights.splice(removeIndex + 1, length)
+        });
     }
 
     /**

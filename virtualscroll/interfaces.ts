@@ -12,7 +12,7 @@ export interface IContainerHeights {
     // Высота вьюпорта
     viewport: number;
     // Высота контейнера
-    scrollHeight: number;
+    scroll: number;
     // Высота триггера
     trigger: number;
 }
