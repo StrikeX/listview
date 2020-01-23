@@ -42,16 +42,11 @@ class Scroll {
         down: boolean;
     }
 
-    private _restoreScrollIndex: number;
-    private _restoreScrollResolve: Function;
-    private _restoreScrollDirection: IDirection;
+    private _scrollTop: number;
 
-    private _itemsChanged: boolean;
+    private _restoreScrollResolve: Function;
 
     private _triggerOffset: number;
-
-    // TODO scrollTop нужно где-то хранить, пока не придумал другого места кроме как этого
-    private _scrollTop: number;
 
     protected _beforeMount(options: IOptions): void {
         if (options.virtualScroll) {
@@ -74,7 +69,7 @@ class Scroll {
             this._virtualScroll.updateItems(Scroll.getItemsHeightsDataByContainer(this._children.itemsContainer));
         }
 
-        if (this._restoreScrollIndex || this._restoreScrollDirection) {
+        if (this._virtualScroll.restoreScroll) {
             this._restoreScrollPosition();
         }
     }
@@ -109,7 +104,6 @@ class Scroll {
                 } else {
                     const range = this._virtualScroll.createNewRange(index, this._options.collection.getCount());
                     this._options.collection.setViewIndices(range);
-                    this._restoreScrollIndex = index;
                     this._restoreScrollResolve = resolve;
                 }
             });
@@ -118,21 +112,17 @@ class Scroll {
         }
     }
 
+    /**
+     * Восстанавливает корректную позицию скролла
+     * @private
+     */
     private _restoreScrollPosition(): void {
-        let position: number;
-
-        if (this._restoreScrollIndex) {
-            position = this._virtualScroll.itemsOffsets[this._restoreScrollIndex];
-        } else {
-            position = this._virtualScroll.getRestoredPosition(this._scrollTop);
-        }
-
-        this._scrollToPosition(position);
+        this._scrollToPosition(this._virtualScroll.getRestoredPosition(this._scrollTop));
 
         if (this._restoreScrollResolve) {
             this._restoreScrollResolve();
+            this._restoreScrollResolve = null;
         }
-        this._restoreScrollDirection = this._restoreScrollIndex = this._restoreScrollResolve = null;
     }
 
     /**
@@ -272,7 +262,7 @@ class Scroll {
     /**
      * Обработчик на событие скролла
      */
-    private _scrollMove(params: IScrollEventParams): void {
+    private _scrollPositionChanged(params: IScrollEventParams): void {
         this._scrollTop = params.scrollTop;
         const activeElementIndex = scrollUtils.getActiveElementIndex(
             this._virtualScroll.range,
@@ -287,8 +277,8 @@ class Scroll {
     /**
      * Обработчик на событие смещения скроллбара
      */
-    private scrollBarMove(params: IScrollEventParams): void {
-        const range = this._virtualScroll.moveToScrollPosition(params.scrollTop);
+    private _scrollBarPositionChanged(params: IScrollEventParams): void {
+        const range = this._virtualScroll.moveToScrollPosition(this._scrollTop);
         this._options.collection.setViewIndices(range);
     }
 
@@ -297,7 +287,7 @@ class Scroll {
      * @param triggerName
      * @param triggerState
      */
-    private triggerVisibilityChanged(triggerName: IDirection, triggerState: boolean): void {
+    private _triggerVisibilityChanged(triggerName: IDirection, triggerState: boolean): void {
         if (triggerState && this._options.virtualScroll) {
             this._recalcToDirection(triggerName);
         } else {

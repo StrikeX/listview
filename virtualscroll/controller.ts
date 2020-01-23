@@ -13,8 +13,13 @@ export default class VirtualScroll {
     private _range: IRange = {start: 0, stop: 0};
     private _oldRange: IRange = {start: 0, stop: 0};
     private _savedDirection: IDirection;
+    private _savedScrollIndex: number;
 
     rangeChanged: boolean;
+
+    get restoreScroll() {
+        return this._savedDirection || this._savedScrollIndex;
+    }
 
     get range() {
         return this._range;
@@ -60,6 +65,8 @@ export default class VirtualScroll {
      * @param itemsHeights Высоты элементов
      */
     createNewRange(startIndex: number, itemsCount: number, itemsHeights?: Partial<IItemsHeights>): IRange {
+        this._savedScrollIndex = startIndex;
+
         if (itemsHeights) {
             this.updateItems(itemsHeights);
 
@@ -148,7 +155,7 @@ export default class VirtualScroll {
         const segmentSize = this._options.segmentSize;
         let {start, stop} = this._range;
 
-        const quantity = VirtualScroll.getItemsToHideQuantity(direction, this._containerHeightsData, itemsHeightsData);
+        const quantity = VirtualScroll.getItemsToHideQuantity(direction, this._range, this._containerHeightsData, itemsHeightsData);
 
         if (direction === 'up') {
             start = Math.max(0, start - segmentSize);
@@ -203,11 +210,19 @@ export default class VirtualScroll {
      * @param scrollTop
      */
     getRestoredPosition(scrollTop: number): number {
+        const itemsOffsets = this._itemsHeightData.itemsOffsets;
         const itemsHeights = this._itemsHeightData.itemsHeights;
-        const savedPosition = this._savedDirection === 'up' ?
-            scrollTop + this._getItemsHeightsSum(this._range.start, this._oldRange.start, itemsHeights) :
-            scrollTop - this._getItemsHeightsSum(this._oldRange.start, this._range.start, itemsHeights);
-        this._savedDirection = null;
+        let savedPosition: number;
+
+        if (this._savedDirection) {
+            savedPosition = this._savedDirection === 'up' ?
+                scrollTop + this._getItemsHeightsSum(this._range.start, this._oldRange.start, itemsHeights) :
+                scrollTop - this._getItemsHeightsSum(this._oldRange.start, this._range.start, itemsHeights);
+        } else if (this._savedScrollIndex) {
+            savedPosition = itemsOffsets[this._savedScrollIndex];
+        }
+
+        this._savedDirection = this._savedScrollIndex = null;
 
         return savedPosition;
     }

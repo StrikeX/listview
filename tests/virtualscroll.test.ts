@@ -6,22 +6,18 @@ describe('VirtualScroll', () => {
         describe('by index', () => {
             let instance: controller;
             beforeEach(() => {
-                instance = new controller({}, {});
+                instance = new controller({pageSize: 5}, {});
             });
             it('from start', () => {
-                instance.setOptions({pageSize: 5});
                 assert.deepEqual({start: 0, stop: 5}, instance.createNewRange(0, 10));
             });
             it('from middle', () => {
-                instance.setOptions({pageSize: 5});
                 assert.deepEqual({start: 3, stop: 8}, instance.createNewRange(3, 10));
             });
             it('from ending', () => {
-                instance.setOptions({pageSize: 5});
                 assert.deepEqual({start: 5, stop: 10}, instance.createNewRange(8, 10));
             });
             it('page size is more than items count', () => {
-                instance.setOptions({pageSize: 5});
                 assert.deepEqual({start: 0, stop: 3}, instance.createNewRange(0, 3));
             });
         });
@@ -79,8 +75,8 @@ describe('VirtualScroll', () => {
     });
     describe('.moveToDirection', () => {
         const instance = new controller({pageSize: 5, segmentSize: 1}, {viewport: 200, trigger: 10, scroll: 600});
-        instance.updateItems({itemsHeights: [60, 60, 60, 60, 60, 60, 60, 60, 60, 60], itemsOffsets: [0, 60, 120, 180, 240, 300, 360, 420, 480, 540]});
         instance.createNewRange(0, 10);
+        instance.updateItems({itemsHeights: [60, 60, 60, 60, 60, 60, 60, 60, 60, 60], itemsOffsets: [0, 60, 120, 180, 240, 300, 360, 420, 480, 540]});
 
         it('to up', () => {
            assert.deepEqual({start: 1, stop: 6}, instance.moveToDirection('up'));
