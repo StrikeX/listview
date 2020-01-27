@@ -69,7 +69,7 @@ class Scroll {
             this._virtualScroll.updateItems(Scroll.getItemsHeightsDataByContainer(this._children.itemsContainer));
         }
 
-        if (this._virtualScroll.restoreScroll) {
+        if (this._virtualScroll.isNeedToRestorePosition) {
             this._restoreScrollPosition();
         }
     }
@@ -102,7 +102,7 @@ class Scroll {
                            scrollUtils.canScrollToItem(index, this._virtualScroll.itemsOffsets, this._virtualScroll.containerHeightsData)) {
                     scrollCallback(this._virtualScroll.itemsOffsets[index]);
                 } else {
-                    const range = this._virtualScroll.createNewRange(index, this._options.collection.getCount());
+                    const range = this._virtualScroll.resetRange(index, this._options.collection.getCount());
                     this._options.collection.setViewIndices(range);
                     this._restoreScrollResolve = resolve;
                 }
@@ -117,7 +117,7 @@ class Scroll {
      * @private
      */
     private _restoreScrollPosition(): void {
-        this._scrollToPosition(this._virtualScroll.getRestoredPosition(this._scrollTop));
+        this._scrollToPosition(this._virtualScroll.getPositionToRestore(this._scrollTop));
 
         if (this._restoreScrollResolve) {
             this._restoreScrollResolve();
@@ -159,7 +159,7 @@ class Scroll {
             };
         }
 
-        const range = this._virtualScroll.createNewRange(initialIndex, options.collection.getCount(), itemsHeights)
+        const range = this._virtualScroll.resetRange(initialIndex, options.collection.getCount(), itemsHeights)
         options.collection.setViewIndices(range);
 
         this._subscribeToCollectionChange(options.collection);
@@ -213,7 +213,7 @@ class Scroll {
         const direction = addIndex < this._virtualScroll.range.start ? 'up' : 'down';
 
         if (this._triggerVisibility[direction]) {
-            const range = this._virtualScroll.addItems(addIndex, items.length);
+            const range = this._virtualScroll.insertItems(addIndex, items.length);
             this._options.collection.setViewIndices(range);
         }
     }
@@ -278,7 +278,7 @@ class Scroll {
      * Обработчик на событие смещения скроллбара
      */
     private _scrollBarPositionChanged(params: IScrollEventParams): void {
-        const range = this._virtualScroll.moveToScrollPosition(this._scrollTop);
+        const range = this._virtualScroll.shiftRangeToScrollPosition(this._scrollTop);
         this._options.collection.setViewIndices(range);
     }
 
@@ -306,7 +306,7 @@ class Scroll {
         if (this._checkEdgeReached(direction)) {
             this._notifyLoadMore(direction);
         } else {
-            const range = this._virtualScroll.moveToDirection(direction);
+            const range = this._virtualScroll.shiftRange(direction);
             this._options.collection.setViewIndices(range);
 
             if (this._checkEdgeReached(direction)) {

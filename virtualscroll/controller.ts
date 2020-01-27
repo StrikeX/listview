@@ -17,7 +17,7 @@ export default class VirtualScroll {
 
     rangeChanged: boolean;
 
-    get restoreScroll() {
+    get isNeedToRestorePosition() {
         return this._savedDirection || this._savedScrollIndex;
     }
 
@@ -64,7 +64,7 @@ export default class VirtualScroll {
      * @param itemsCount Общее количество элементов
      * @param itemsHeights Высоты элементов
      */
-    createNewRange(startIndex: number, itemsCount: number, itemsHeights?: Partial<IItemsHeights>): IRange {
+    resetRange(startIndex: number, itemsCount: number, itemsHeights?: Partial<IItemsHeights>): IRange {
         this._savedScrollIndex = startIndex;
 
         if (itemsHeights) {
@@ -81,7 +81,7 @@ export default class VirtualScroll {
      * @remark
      * Вызывается при смещении скролла за счет движения скроллбара
      */
-    moveToScrollPosition(scrollTop: number): IRange {
+    shiftRangeToScrollPosition(virtualScrollPosition: number): IRange {
         const itemsHeights = this._itemsHeightData.itemsHeights;
         const pageSize = this._options.pageSize;
         const itemsCount = itemsHeights.length;
@@ -90,7 +90,7 @@ export default class VirtualScroll {
         let start = 0, stop;
         let tempPlaceholderSize = 0;
 
-        while (tempPlaceholderSize + itemsHeights[start] <= scrollTop - triggerHeight) {
+        while (tempPlaceholderSize + itemsHeights[start] <= virtualScrollPosition - triggerHeight) {
             tempPlaceholderSize += itemsHeights[start];
             start++;
         }
@@ -120,7 +120,7 @@ export default class VirtualScroll {
      * @param addIndex индекс начиная с которого происходит вставка элементов
      * @param count количество вставляемых элементов
      */
-    addItems(addIndex: number, count: number): IRange {
+    insertItems(addIndex: number, count: number): IRange {
         const direction = addIndex >= this._range.start ? 'up' : 'down';
         this._insertItemHeights(addIndex, count);
 
@@ -128,7 +128,7 @@ export default class VirtualScroll {
             this._updateStartIndex(this._range.start + count, this._itemsHeightData.itemsHeights.length);
         }
 
-        return this.moveToDirection(direction);
+        return this._range;
     }
 
     /**
@@ -140,14 +140,14 @@ export default class VirtualScroll {
         const direction = removeIndex < this._range.start ? 'up' : 'down';
         this._removeItemHeights(removeIndex, count);
 
-        return this.moveToDirection(direction);
+        return this.shiftRange(direction);
     }
 
     /**
      * Производит смещение диапазона по направлению на segmentSize
      * @param direction
      */
-    moveToDirection(direction: IDirection): IRange {
+    shiftRange(direction: IDirection): IRange {
         this._oldRange = this._range;
         this._savedDirection = direction;
         const itemsHeightsData = this._itemsHeightData;
@@ -209,7 +209,7 @@ export default class VirtualScroll {
      * Возвращает восстановленную позицию скролла по направлению
      * @param scrollTop
      */
-    getRestoredPosition(scrollTop: number): number {
+    getPositionToRestore(scrollTop: number): number {
         const itemsOffsets = this._itemsHeightData.itemsOffsets;
         const itemsHeights = this._itemsHeightData.itemsHeights;
         let savedPosition: number;
