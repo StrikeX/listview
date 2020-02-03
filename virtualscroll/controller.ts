@@ -25,20 +25,8 @@ export default class VirtualScroll {
         return this._range;
     }
 
-    get containerHeightsData() {
-        return this._containerHeightsData;
-    }
-
     get itemsHeightsData() {
         return this._itemsHeightData;
-    }
-
-    get itemsOffsets() {
-        return this._itemsHeightData.itemsOffsets;
-    }
-
-    get itemsHeights() {
-        return this._itemsHeightData.itemsHeights;
     }
 
     constructor(
@@ -128,7 +116,7 @@ export default class VirtualScroll {
             this._updateStartIndex(this._range.start + count, this._itemsHeightData.itemsHeights.length);
         }
 
-        return this._range;
+        return this.shiftRange(direction);
     }
 
     /**
@@ -155,14 +143,19 @@ export default class VirtualScroll {
         const segmentSize = this._options.segmentSize;
         let {start, stop} = this._range;
 
-        const quantity = VirtualScroll.getItemsToHideQuantity(direction, this._range, this._containerHeightsData, itemsHeightsData);
+        if (segmentSize) {
+            const quantity = VirtualScroll.getItemsToHideQuantity(direction, this._range, this._containerHeightsData, itemsHeightsData);
 
-        if (direction === 'up') {
-            start = Math.max(0, start - segmentSize);
-            stop -= quantity;
+            if (direction === 'up') {
+                start = Math.max(0, start - segmentSize);
+                stop -= quantity;
+            } else {
+                stop = Math.min(stop + segmentSize, itemsCount);
+                start += quantity;
+            }
         } else {
-            stop = Math.min(stop + segmentSize, itemsCount);
-            start += quantity;
+            start = 0;
+            stop = itemsCount;
         }
 
         return this._setRange({start, stop});
@@ -235,6 +228,14 @@ export default class VirtualScroll {
         return this._range.start >= itemIndex && this._range.stop <= itemIndex;
     }
 
+    canScrollToItem(itemIndex: number): boolean {
+        // Рассчет возможности подскроллить к активному элементу
+    }
+
+    getActiveElementIndex(scrollTop: number): number {
+        // Рассчет активного элемента исходя из текущего scrollTop
+    }
+
     /**
      * Расчет видимых индексов от заранее высчитанных высот
      * @remark
@@ -297,7 +298,7 @@ export default class VirtualScroll {
         const pageSize = this._options.pageSize;
         let start, stop;
 
-        if (pageSize < itemsCount) {
+        if (pageSize < itemsCount || !pageSize) {
             start = startIndex;
             stop = start + pageSize;
 

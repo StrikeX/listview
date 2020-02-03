@@ -1,10 +1,8 @@
 import VirtualScroll from './virtualscroll/controller';
-import * as scrollUtils from './virtualscroll/util';
 import {ICollection} from "./interfaces";
 import {
     IDirection,
     IItemsHeights,
-    IRange,
     IVirtualScrollOptions
 } from "./virtualscroll/interfaces";
 
@@ -59,13 +57,13 @@ class Scroll {
     }
 
     protected _beforeUpdate(options: IOptions): void {
-        if (options.collection !== this._options.collection && this._options.virtualScroll) {
+        if (options.collection !== this._options.collection) {
             this._initVirtualScroll(options);
         }
     }
 
     protected _afterRender(): void {
-        if (this._options.virtualScroll && this._virtualScroll.rangeChanged) {
+        if (this._virtualScroll.rangeChanged) {
             this._virtualScroll.updateItems(Scroll.getItemsHeightsDataByContainer(this._children.itemsContainer));
         }
 
@@ -98,8 +96,7 @@ class Scroll {
                     } else {
                         reject();
                     }
-                } else if (this._virtualScroll.isItemInRange(index) &&
-                           scrollUtils.canScrollToItem(index, this._virtualScroll.itemsOffsets, this._virtualScroll.containerHeightsData)) {
+                } else if (this._virtualScroll.canScrollToItem(index)) {
                     scrollCallback(this._virtualScroll.itemsOffsets[index]);
                 } else {
                     const range = this._virtualScroll.resetRange(index, this._options.collection.getCount());
@@ -159,7 +156,7 @@ class Scroll {
             };
         }
 
-        const range = this._virtualScroll.resetRange(initialIndex, options.collection.getCount(), itemsHeights)
+        const range = this._virtualScroll.resetRange(initialIndex, options.collection.getCount(), itemsHeights);
         options.collection.setViewIndices(range);
 
         this._subscribeToCollectionChange(options.collection);
@@ -264,10 +261,8 @@ class Scroll {
      */
     private _scrollPositionChanged(params: IScrollEventParams): void {
         this._scrollTop = params.scrollTop;
-        const activeElementIndex = scrollUtils.getActiveElementIndex(
-            this._virtualScroll.range,
-            this._virtualScroll.itemsHeightsData,
-            this._virtualScroll.containerHeightsData
+        const activeElementIndex = this._virtualScroll.getActiveElementIndex(
+            this._scrollTop
         );
 
         const activeElementId = this._options.collection.getItemIdByIndex(activeElementIndex);
@@ -278,7 +273,7 @@ class Scroll {
      * Обработчик на событие смещения скроллбара
      */
     private _scrollBarPositionChanged(params: IScrollEventParams): void {
-        const range = this._virtualScroll.shiftRangeToScrollPosition(this._scrollTop);
+        const range = this._virtualScroll.shiftRangeToScrollPosition(params.scrollTop);
         this._options.collection.setViewIndices(range);
     }
 
@@ -288,10 +283,8 @@ class Scroll {
      * @param triggerState
      */
     private _triggerVisibilityChanged(triggerName: IDirection, triggerState: boolean): void {
-        if (triggerState && this._options.virtualScroll) {
+        if (triggerState) {
             this._recalcToDirection(triggerName);
-        } else {
-            this._notifyLoadMore(triggerName);
         }
 
         this._triggerVisibility[triggerName] = triggerState;
