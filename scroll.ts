@@ -47,9 +47,7 @@ class Scroll {
     private _triggerOffset: number;
 
     protected _beforeMount(options: IOptions): void {
-        if (options.virtualScroll) {
-            this._initVirtualScroll(options);
-        }
+        this._initVirtualScroll(options);
     }
 
     protected _afterMount(): void {
@@ -88,15 +86,7 @@ class Scroll {
                     resolve();
                 };
 
-                if (!this._options.virtualScroll) {
-                    const child = this._children.itemsContainer[index];
-
-                    if (child) {
-                        scrollCallback(child.offsetTop)
-                    } else {
-                        reject();
-                    }
-                } else if (this._virtualScroll.canScrollToItem(index)) {
+                if (this._virtualScroll.canScrollToItem(index)) {
                     scrollCallback(this._virtualScroll.itemsOffsets[index]);
                 } else {
                     const range = this._virtualScroll.resetRange(index, this._options.collection.getCount());
@@ -240,20 +230,16 @@ class Scroll {
      * @param params
      */
     private _viewportResize(params: IScrollEventParams): void {
-        if (this._options.virtualScroll) {
-            this._virtualScroll.resizeViewport(params.viewportHeight, Scroll.getItemsHeightsDataByContainer(this._children.itemsContainer));
-            this._updateTriggerOffset(params.scrollHeight, params.viewportHeight);
-        }
+        this._virtualScroll.resizeViewport(params.viewportHeight, Scroll.getItemsHeightsDataByContainer(this._children.itemsContainer));
+        this._updateTriggerOffset(params.scrollHeight, params.viewportHeight);
     }
 
     /**
      * Обработчик смены размера контейнера с элементами
      */
     private _viewResize(params: IScrollEventParams): void {
-        if (this._options.virtualScroll) {
-            this._virtualScroll.resizeView(params.scrollHeight, Scroll.getItemsHeightsDataByContainer(this._children.itemsContainer));
-            this._updateTriggerOffset(params.scrollHeight, params.viewportHeight);
-        }
+        this._virtualScroll.resizeView(params.scrollHeight, Scroll.getItemsHeightsDataByContainer(this._children.itemsContainer));
+        this._updateTriggerOffset(params.scrollHeight, params.viewportHeight);
     }
 
     /**
