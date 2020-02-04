@@ -197,12 +197,8 @@ class Scroll {
      * @private
      */
     private _itemsAddedHandler(addIndex: number, items: CollectionItem[]): void {
-        const direction = addIndex < this._virtualScroll.range.start ? 'up' : 'down';
-
-        if (this._triggerVisibility[direction]) {
-            const range = this._virtualScroll.insertItems(addIndex, items.length);
-            this._options.collection.setViewIndices(range);
-        }
+        const range = this._virtualScroll.insertItems(addIndex, items.length);
+        this._options.collection.setViewIndices(range);
     }
 
     /**
