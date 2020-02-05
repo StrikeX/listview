@@ -40,6 +40,8 @@ class Scroll {
         down: boolean;
     }
 
+    private __mounted: boolean;
+
     private _scrollTop: number;
 
     private _restoreScrollResolve: Function;
@@ -51,6 +53,7 @@ class Scroll {
     }
 
     protected _afterMount(): void {
+        this.__mounted = true;
         this._observeScrollEvents();
     }
 
@@ -86,6 +89,8 @@ class Scroll {
                     resolve();
                 } else {
                     const range = this._virtualScroll.resetRange(index, this._options.collection.getCount());
+                    const placeholders = this._virtualScroll.getPlaceholders();
+                    this._notifyPlaceholdersChanged(placeholders);
                     this._options.collection.setViewIndices(range);
                     this._restoreScrollResolve = resolve;
                 }
@@ -143,6 +148,12 @@ class Scroll {
         }
 
         const range = this._virtualScroll.resetRange(initialIndex, options.collection.getCount(), itemsHeights);
+
+        if (this.__mounted) {
+            const placeholders = this._virtualScroll.getPlaceholders();
+            this._notifyPlaceholdersChanged(placeholders);
+        }
+
         options.collection.setViewIndices(range);
 
         this._subscribeToCollectionChange(options.collection);
