@@ -36,4 +36,9 @@ export interface IVirtualScrollOptions {
     segmentSize: number;
 }
 
+export interface IPlaceholders {
+    top: number;
+    bottom: number;
+}
+
 export type IDirection = 'up' | 'down';

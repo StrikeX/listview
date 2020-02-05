@@ -3,7 +3,7 @@ import {
     IContainerHeights,
     IDirection,
     IItemsHeights,
-    IVirtualScrollOptions
+    IVirtualScrollOptions, IPlaceholders
 } from "./interfaces";
 
 export default class VirtualScroll {
@@ -234,6 +234,13 @@ export default class VirtualScroll {
 
     getActiveElementIndex(scrollTop: number): number {
         // Рассчет активного элемента исходя из текущего scrollTop
+    }
+
+    getPlaceholders(): IPlaceholders {
+        return {
+            top: this._getItemsHeightsSum(0, this._range.start, this._itemsHeightData.itemsHeights),
+            bottom: this._getItemsHeightsSum(this._range.stop, this._itemsHeightData.itemsHeights.length, this._itemsHeightData.itemsHeights)
+        };
     }
 
     /**

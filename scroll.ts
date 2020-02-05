@@ -2,7 +2,7 @@ import VirtualScroll from './virtualscroll/controller';
 import {ICollection} from "./interfaces";
 import {
     IDirection,
-    IItemsHeights,
+    IItemsHeights, IPlaceholders,
     IVirtualScrollOptions
 } from "./virtualscroll/interfaces";
 
@@ -81,13 +81,9 @@ class Scroll {
 
         if (index) {
             return new Promise((resolve, reject) => {
-                const scrollCallback = (position: number) => {
-                    this._scrollToPosition(position);
-                    resolve();
-                };
-
                 if (this._virtualScroll.canScrollToItem(index)) {
-                    scrollCallback(this._virtualScroll.itemsOffsets[index]);
+                    this._scrollToPosition(this._virtualScroll.itemsOffsets[index]);
+                    resolve();
                 } else {
                     const range = this._virtualScroll.resetRange(index, this._options.collection.getCount());
                     this._options.collection.setViewIndices(range);
@@ -198,6 +194,8 @@ class Scroll {
      */
     private _itemsAddedHandler(addIndex: number, items: CollectionItem[]): void {
         const range = this._virtualScroll.insertItems(addIndex, items.length);
+        const placeholders = this._virtualScroll.getPlaceholders();
+        this._notifyPlaceholdersChanged(placeholders);
         this._options.collection.setViewIndices(range);
     }
 
@@ -209,6 +207,8 @@ class Scroll {
      */
     private _itemsRemovedHandler(removeIndex: number, items: CollectionItem[]): void {
         const range = this._virtualScroll.removeItems(removeIndex, items.length);
+        const placeholders = this._virtualScroll.getPlaceholders();
+        this._notifyPlaceholdersChanged(placeholders);
         this._options.collection.setViewIndices(range);
     }
 
@@ -256,6 +256,8 @@ class Scroll {
      */
     private _scrollBarPositionChanged(params: IScrollEventParams): void {
         const range = this._virtualScroll.shiftRangeToScrollPosition(params.scrollTop);
+        const placeholders = this._virtualScroll.getPlaceholders();
+        this._notifyPlaceholdersChanged(placeholders);
         this._options.collection.setViewIndices(range);
     }
 
@@ -282,6 +284,8 @@ class Scroll {
             this._notifyLoadMore(direction);
         } else {
             const range = this._virtualScroll.shiftRange(direction);
+            const placeholders = this._virtualScroll.getPlaceholders();
+            this._notifyPlaceholdersChanged(placeholders);
             this._options.collection.setViewIndices(range);
 
             if (this._checkEdgeReached(direction)) {
@@ -307,6 +311,15 @@ class Scroll {
      */
     private _notifyLoadMore(direction: IDirection): void {
         this._notify('loadMore', [direction]);
+    }
+
+    /**
+     * Нотифицирует о смене размера заглушек
+     * @param placeholders
+     * @private
+     */
+    private _notifyPlaceholdersChanged(placeholders: IPlaceholders): void {
+        this._notify('placeholdersChanged', [placeholders]);
     }
 
     /**
