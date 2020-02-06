@@ -14,6 +14,9 @@ export default class VirtualScroll {
     private _oldRange: IRange = {start: 0, stop: 0};
     private _savedDirection: IDirection;
     private _savedScrollIndex: number;
+    private get _itemsCount(): number {
+        return this._itemsHeightData.itemsHeights.length;
+    }
 
     rangeChanged: boolean;
 
@@ -228,12 +231,52 @@ export default class VirtualScroll {
         return this._range.start >= itemIndex && this._range.stop <= itemIndex;
     }
 
+    /**
+     * Проверяет возможность подскроллить к верхней границе элемента
+     * @param itemIndex 
+     */
     canScrollToItem(itemIndex: number): boolean {
-        // Рассчет возможности подскроллить к активному элементу
+        let canScroll = false;
+        const {viewport, scroll: scrollHeight} = this._containerHeightsData;
+        const itemOffset = this._itemsHeightData.itemsOffsets[itemIndex];
+
+        if (this._range.stop === this._itemsCount) {
+            canScroll = true;
+        } else if (this.isItemInRange(itemIndex) &&
+                   viewport < scrollHeight - itemOffset) {
+            canScroll = true;
+        }
+
+        return canScroll;
     }
 
+    /**
+     * Возвращает индекс активного элемента
+     * @param scrollTop 
+     */
     getActiveElementIndex(scrollTop: number): number {
-        // Рассчет активного элемента исходя из текущего scrollTop
+        if (!this._itemsCount) {
+            return undefined;
+        } else if (this.isScrolledToBottom(scrollTop)) {
+            return this._range.stop - 1;
+        } else if (this.isScrolledToTop(scrollTop)) {
+            return this._range.start
+        } else {
+            let itemIndex;
+            const {itemsOffsets} = this._itemsHeightData;
+            const {viewport} = this._containerHeightsData;
+            const viewportCenter = scrollTop + viewport / 2;
+
+            for (let i = this._range.start ; i < this._range.stop; i++) {
+                if (itemsOffsets[i] < viewportCenter) {
+                    itemIndex = i;
+                } else {
+                    break;
+                }
+            }
+
+            return itemIndex;
+        }
     }
 
     getPlaceholders(): IPlaceholders {
