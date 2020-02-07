@@ -5,6 +5,11 @@ export interface IRange {
     stop: number;
 }
 
+export interface IRangeShiftResult {
+    range: IRange;
+    placeholders: IPlaceholders;
+}
+
 /**
  * Интерфейс с данными об высотах
  */

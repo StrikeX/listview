@@ -42,7 +42,7 @@ class Scroll {
 
     private __mounted: boolean;
 
-    private _scrollTop: number;
+    private _lastScrollTop: number;
 
     private _restoreScrollResolve: Function;
 
@@ -65,7 +65,8 @@ class Scroll {
 
     protected _afterRender(): void {
         if (this._virtualScroll.rangeChanged) {
-            this._virtualScroll.updateItems(Scroll.getItemsHeightsDataByContainer(this._children.itemsContainer));
+            this._virtualScroll.updateItemsHeights(this._children.itemsContainer);
+            this._virtualScroll.rangeChanged = false;
         }
 
         if (this._virtualScroll.isNeedToRestorePosition) {
@@ -83,15 +84,14 @@ class Scroll {
         const index = this._options.collection.getIndexById(key);
 
         if (index) {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 if (this._virtualScroll.canScrollToItem(index)) {
-                    this._scrollToPosition(this._virtualScroll.itemsOffsets[index]);
+                    this._scrollToPosition(this._virtualScroll.getItemOffset(index));
                     resolve();
                 } else {
-                    const range = this._virtualScroll.resetRange(index, this._options.collection.getCount());
-                    const placeholders = this._virtualScroll.getPlaceholders();
-                    this._notifyPlaceholdersChanged(placeholders);
-                    this._options.collection.setViewIndices(range);
+                    const rangeShiftResult = this._virtualScroll.resetRange(index, this._options.collection.getCount());
+                    this._notifyPlaceholdersChanged(rangeShiftResult.placeholders);
+                    this._options.collection.setViewIndices(rangeShiftResult.range);
                     this._restoreScrollResolve = resolve;
                 }
             });
@@ -105,7 +105,7 @@ class Scroll {
      * @private
      */
     private _restoreScrollPosition(): void {
-        this._scrollToPosition(this._virtualScroll.getPositionToRestore(this._scrollTop));
+        this._scrollToPosition(this._virtualScroll.getPositionToRestore(this._lastScrollTop));
 
         if (this._restoreScrollResolve) {
             this._restoreScrollResolve();
@@ -147,14 +147,9 @@ class Scroll {
             };
         }
 
-        const range = this._virtualScroll.resetRange(initialIndex, options.collection.getCount(), itemsHeights);
-
-        if (this.__mounted) {
-            const placeholders = this._virtualScroll.getPlaceholders();
-            this._notifyPlaceholdersChanged(placeholders);
-        }
-
-        options.collection.setViewIndices(range);
+        const rangeShiftResult = this._virtualScroll.resetRange(initialIndex, options.collection.getCount(), itemsHeights);
+        this._notifyPlaceholdersChanged(rangeShiftResult.placeholders);
+        options.collection.setViewIndices(rangeShiftResult.range);
 
         this._subscribeToCollectionChange(options.collection);
     }
@@ -204,10 +199,9 @@ class Scroll {
      * @private
      */
     private _itemsAddedHandler(addIndex: number, items: CollectionItem[]): void {
-        const range = this._virtualScroll.insertItems(addIndex, items.length);
-        const placeholders = this._virtualScroll.getPlaceholders();
-        this._notifyPlaceholdersChanged(placeholders);
-        this._options.collection.setViewIndices(range);
+        const rangeShiftResult = this._virtualScroll.insertItems(addIndex, items.length);
+        this._notifyPlaceholdersChanged(rangeShiftResult.placeholders);
+        this._options.collection.setViewIndices(rangeShiftResult.range);
     }
 
     /**
@@ -217,10 +211,9 @@ class Scroll {
      * @private
      */
     private _itemsRemovedHandler(removeIndex: number, items: CollectionItem[]): void {
-        const range = this._virtualScroll.removeItems(removeIndex, items.length);
-        const placeholders = this._virtualScroll.getPlaceholders();
-        this._notifyPlaceholdersChanged(placeholders);
-        this._options.collection.setViewIndices(range);
+        const rangeShiftResult = this._virtualScroll.removeItems(removeIndex, items.length);
+        this._notifyPlaceholdersChanged(rangeShiftResult.placeholders);
+        this._options.collection.setViewIndices(rangeShiftResult.range);
     }
 
     /**
@@ -237,25 +230,27 @@ class Scroll {
      * @param params
      */
     private _viewportResize(params: IScrollEventParams): void {
-        this._virtualScroll.resizeViewport(params.viewportHeight, Scroll.getItemsHeightsDataByContainer(this._children.itemsContainer));
         this._updateTriggerOffset(params.scrollHeight, params.viewportHeight);
+        this._virtualScroll.resizeViewport(params.viewportHeight, this._triggerOffset);
+        this._virtualScroll.updateItemsHeights(this._children.itemsContainer);
     }
 
     /**
      * Обработчик смены размера контейнера с элементами
      */
     private _viewResize(params: IScrollEventParams): void {
-        this._virtualScroll.resizeView(params.scrollHeight, Scroll.getItemsHeightsDataByContainer(this._children.itemsContainer));
         this._updateTriggerOffset(params.scrollHeight, params.viewportHeight);
+        this._virtualScroll.resizeView(params.scrollHeight, this._triggerOffset);
+        this._virtualScroll.updateItemsHeights(this._children.itemsContainer);
     }
 
     /**
      * Обработчик на событие скролла
      */
     private _scrollPositionChanged(params: IScrollEventParams): void {
-        this._scrollTop = params.scrollTop;
+        this._lastScrollTop = params.scrollTop;
         const activeElementIndex = this._virtualScroll.getActiveElementIndex(
-            this._scrollTop
+            this._lastScrollTop
         );
 
         const activeElementId = this._options.collection.getItemIdByIndex(activeElementIndex);
@@ -266,23 +261,22 @@ class Scroll {
      * Обработчик на событие смещения скроллбара
      */
     private _scrollBarPositionChanged(params: IScrollEventParams): void {
-        const range = this._virtualScroll.shiftRangeToScrollPosition(params.scrollTop);
-        const placeholders = this._virtualScroll.getPlaceholders();
-        this._notifyPlaceholdersChanged(placeholders);
-        this._options.collection.setViewIndices(range);
+        const rangeShiftResult = this._virtualScroll.shiftRangeToScrollPosition(params.scrollTop);
+        this._notifyPlaceholdersChanged(rangeShiftResult.placeholders);
+        this._options.collection.setViewIndices(rangeShiftResult.range);
     }
 
     /**
      * Обработчик на событие смены видимости триггера
      * @param triggerName
-     * @param triggerState
+     * @param triggerVisible
      */
-    private _triggerVisibilityChanged(triggerName: IDirection, triggerState: boolean): void {
-        if (triggerState) {
+    private _triggerVisibilityChanged(triggerName: IDirection, triggerVisible: boolean): void {
+        if (triggerVisible) {
             this._recalcToDirection(triggerName);
         }
 
-        this._triggerVisibility[triggerName] = triggerState;
+        this._triggerVisibility[triggerName] = triggerVisible;
     }
 
     /**
@@ -291,28 +285,17 @@ class Scroll {
      * @private
      */
     private _recalcToDirection(direction: IDirection): void {
-        if (this._checkEdgeReached(direction)) {
+        if (this._virtualScroll.isRangeOnEdge(direction)) {
             this._notifyLoadMore(direction);
         } else {
-            const range = this._virtualScroll.shiftRange(direction);
-            const placeholders = this._virtualScroll.getPlaceholders();
-            this._notifyPlaceholdersChanged(placeholders);
-            this._options.collection.setViewIndices(range);
+            const rangeShiftResult = this._virtualScroll.shiftRange(direction);
+            this._notifyPlaceholdersChanged(rangeShiftResult.placeholders);
+            this._options.collection.setViewIndices(rangeShiftResult.range);
 
-            if (this._checkEdgeReached(direction)) {
+            if (this._virtualScroll.isRangeOnEdge(direction)) {
                 this._notifyLoadMore(direction);
             }
         }
-    }
-
-    /**
-     * Проверяет что virtualScroll достиг края данных
-     * @param direction
-     * @private
-     */
-    private _checkEdgeReached(direction: IDirection): boolean {
-        return this._virtualScroll.range.start === 0 && direction === 'up' ||
-               this._virtualScroll.range.stop === this._options.collection.getCount() && direction === 'down';
     }
 
     /**
@@ -330,7 +313,9 @@ class Scroll {
      * @private
      */
     private _notifyPlaceholdersChanged(placeholders: IPlaceholders): void {
-        this._notify('placeholdersChanged', [placeholders]);
+        if (this.__mounted) {
+            this._notify('placeholdersChanged', [placeholders]);
+        }
     }
 
     /**
@@ -340,41 +325,6 @@ class Scroll {
      * @private
      */
     private _updateTriggerOffset(scrollHeight: number, viewportHeight: number): void {
-        this._triggerOffset = Scroll.calcTriggerOffset(scrollHeight, viewportHeight);
-        this._virtualScroll.resizeTrigger(this._triggerOffset);
-    }
-
-    /**
-     * Вычисляет позицию триггера
-     * @param scrollHeight
-     * @param viewportHeight
-     */
-    private static calcTriggerOffset(scrollHeight: number, viewportHeight: number): number {
-        return (scrollHeight && viewportHeight ? Math.min(scrollHeight, viewportHeight) : 0) * 0.3;
-    }
-
-    /**
-     * Вычисляет реальные высоты элемента
-     * @param container
-     */
-    private static getItemsHeightsDataByContainer(container: HTMLElement): IItemsHeights {
-        const itemsHeights = [];
-        const itemsOffsets = [];
-
-        let sum = 0;
-
-        Array.prototype.forEach.apply(container.children, (item: HTMLElement, i) => {
-            const itemHeight = item.getBoundingClientRect().height;
-
-            itemsHeights[i] = itemHeight;
-            itemsOffsets[i] = sum;
-
-            sum += itemHeight;
-        });
-
-        return {
-            itemsHeights,
-            itemsOffsets
-        }
+        this._triggerOffset = (scrollHeight && viewportHeight ? Math.min(scrollHeight, viewportHeight) : 0) * 0.3;
     }
 }
